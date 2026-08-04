@@ -366,17 +366,47 @@ async function runSearch() {
 
 // ---------- admin ----------
 
+async function postFile(url, file, { timeoutMs = 90000 } = {}) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let r;
+  try {
+    r = await fetch(url, { method: "POST", body: fd, signal: controller.signal });
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === "AbortError") {
+      return { ok: false, message: `Timed out waiting ${Math.round(timeoutMs / 1000)}s for a response. Check the Vercel project's function logs to see what actually happened server-side.` };
+    }
+    return { ok: false, message: `Network error: ${err.message}` };
+  }
+  clearTimeout(timer);
+
+  const raw = await r.text();
+  let data = null;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch (parseErr) {
+    // Platform-level errors (timeout, payload-too-large, etc.) often come back
+    // as HTML/plain-text, not JSON - surface that instead of failing silently.
+    return { ok: false, message: `Server returned ${r.status} ${r.statusText || ""} (non-JSON response)${raw ? ": " + raw.slice(0, 300) : ""}` };
+  }
+  if (!r.ok) {
+    return { ok: false, message: `Error ${r.status}: ${(data && data.detail) || r.statusText}` };
+  }
+  return { ok: true, data };
+}
+
 function wireAdmin() {
   document.getElementById("upload-disclosure").addEventListener("click", async () => {
     const input = document.getElementById("disclosure-file");
     const out = document.getElementById("disclosure-result");
     if (!input.files.length) { out.textContent = "Choose a file first."; return; }
-    out.textContent = "Uploading and matching…";
-    const fd = new FormData();
-    fd.append("file", input.files[0]);
-    const r = await fetch("/api/upload/disclosure", { method: "POST", body: fd });
-    const data = await r.json();
-    if (!r.ok) { out.textContent = "Error: " + (data.detail || r.statusText); return; }
+    out.textContent = "Uploading and matching… (large files can take up to a minute)";
+    const result = await postFile("/api/upload/disclosure", input.files[0]);
+    if (!result.ok) { out.textContent = result.message; return; }
+    const data = result.data;
     out.textContent = `Inserted ${data.ingest.inserted}, updated ${data.ingest.updated} ` +
       `(skipped ${data.ingest.skipped_invalid_status} non-certified, ${data.ingest.skipped_missing_data} incomplete, ${data.ingest.skipped_duplicate_rows} duplicate rows).\n` +
       `Matching: ${data.rematch.auto} auto-matched, ${data.rematch.review} queued for review, ${data.rematch.prospect} prospects.`;
@@ -388,11 +418,9 @@ function wireAdmin() {
     const out = document.getElementById("customers-result");
     if (!input.files.length) { out.textContent = "Choose a file first."; return; }
     out.textContent = "Uploading and matching…";
-    const fd = new FormData();
-    fd.append("file", input.files[0]);
-    const r = await fetch("/api/upload/customers", { method: "POST", body: fd });
-    const data = await r.json();
-    if (!r.ok) { out.textContent = "Error: " + (data.detail || r.statusText); return; }
+    const result = await postFile("/api/upload/customers", input.files[0]);
+    if (!result.ok) { out.textContent = result.message; return; }
+    const data = result.data;
     out.textContent = `Enterprises created: ${data.ingest.enterprises_created}, aliases created: ${data.ingest.aliases_created}, updated: ${data.ingest.aliases_updated}.\n` +
       `Matching: ${data.rematch.auto} auto-matched, ${data.rematch.review} queued for review, ${data.rematch.prospect} prospects.`;
     await refreshAll();
