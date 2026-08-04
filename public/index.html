@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>H-2A Transfer Matcher</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">H-2A Transfer Matcher</div>
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+    <button class="tab-btn" data-tab="search">Search</button>
+    <button class="tab-btn" data-tab="admin">Admin<span id="review-badge" class="badge hidden">0</span></button>
+  </nav>
+</header>
+
+<div id="stats-bar" class="stats-bar"></div>
+
+<main>
+  <!-- DASHBOARD -->
+  <section id="tab-dashboard" class="tab-panel active">
+    <div class="panel">
+      <h2>Best matches right now</h2>
+      <div id="kpi-row" class="kpi-row"></div>
+      <div class="chart-grid">
+        <div class="chart-card">
+          <div class="chart-head">
+            <h3>Top matches by transferable workers</h3>
+            <div class="legend" id="top-matches-legend"></div>
+          </div>
+          <div id="top-matches-chart"></div>
+        </div>
+        <div class="chart-card">
+          <h3>Matches by transfer-window gap</h3>
+          <div id="gap-histogram-chart"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Seso Customer &harr; Seso Customer Matches</h2>
+        <div class="controls">
+          <label>Sort
+            <select id="cc-sort">
+              <option value="workers">Most workers</option>
+              <option value="gap">Smallest gap</option>
+              <option value="soonest">Soonest</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div id="cc-total" class="muted"></div>
+      <div class="table-wrap"><table id="cc-table"><thead></thead><tbody></tbody></table></div>
+      <button id="cc-more" class="link-btn hidden">Load more</button>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Seso Customer &harr; Prospect Matches</h2>
+        <div class="controls">
+          <label>Sort
+            <select id="cp-sort">
+              <option value="workers">Most workers</option>
+              <option value="gap">Smallest gap</option>
+              <option value="soonest">Soonest</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div id="cp-total" class="muted"></div>
+      <div class="table-wrap"><table id="cp-table"><thead></thead><tbody></tbody></table></div>
+      <button id="cp-more" class="link-btn hidden">Load more</button>
+    </div>
+  </section>
+
+  <!-- SEARCH -->
+  <section id="tab-search" class="tab-panel">
+    <div class="panel">
+      <h2>Find matches</h2>
+      <p class="muted">Put in a contract date and worker count and get matching Seso customers &mdash; works for a brand-new prospect that isn't in the disclosure data at all. Optionally look up an existing filing first to prefill the fields.</p>
+
+      <div class="search-row">
+        <label class="field-label">Prospect / employer name <span class="muted">(optional &mdash; just for prefill and the results label)</span></label>
+        <input id="prospect-input" type="text" placeholder="Start typing an employer name&hellip;" autocomplete="off">
+        <div id="prospect-suggestions" class="suggestions hidden"></div>
+      </div>
+
+      <div id="prospect-contracts" class="hidden">
+        <h3>Prefill from an existing filing?</h3>
+        <div id="contract-list"></div>
+      </div>
+
+      <div class="quick-match-form">
+        <h3>What is the goal?</h3>
+        <div class="mode-row">
+          <label class="mode-option">
+            <input type="radio" name="mode" value="needs_workers" checked>
+            <span>Needs workers <small>&mdash; find Seso customers whose contracts are ending in time to transfer workers in</small></span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" name="mode" value="save_transportation">
+            <span>Save on outbound transportation <small>&mdash; find Seso customers whose contracts are starting soon after this one ends</small></span>
+          </label>
+        </div>
+
+        <div class="form-row">
+          <label>
+            <span id="date-field-label">Contract start date</span>
+            <input type="date" id="quick-date">
+          </label>
+          <label>
+            Number of workers
+            <input type="number" id="quick-workers" min="1" step="1" placeholder="e.g. 40">
+          </label>
+        </div>
+        <div id="quick-match-error" class="error-text hidden"></div>
+        <button id="run-search" class="primary-btn">Search</button>
+      </div>
+
+      <div id="search-results" class="hidden">
+        <h3 id="search-results-title"></h3>
+        <div class="table-wrap"><table id="search-table"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ADMIN -->
+  <section id="tab-admin" class="tab-panel">
+    <div class="panel">
+      <h2>Upload data</h2>
+      <div class="upload-row">
+        <div class="upload-card">
+          <h3>H-2A Disclosure Data (.xlsx)</h3>
+          <p class="muted">Quarterly DOL disclosure file. Existing cases are updated by case number; new ones are added.</p>
+          <input type="file" id="disclosure-file" accept=".xlsx">
+          <button id="upload-disclosure" class="primary-btn">Upload</button>
+          <div id="disclosure-result" class="upload-result"></div>
+        </div>
+        <div class="upload-card">
+          <h3>Active Customers/Enterprises (.csv)</h3>
+          <p class="muted">Enterprise Account Name, Entity ID, Entity Name. Re-uploading refreshes the customer list and re-runs matching.</p>
+          <input type="file" id="customers-file" accept=".csv">
+          <button id="upload-customers" class="primary-btn">Upload</button>
+          <div id="customers-result" class="upload-result"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Review queue <span id="review-count" class="muted"></span></h2>
+      <p class="muted">Disclosure employer names that fuzzy-matched a Seso customer with medium confidence. Confirm or reject each one.</p>
+      <div class="table-wrap"><table id="review-table"><thead></thead><tbody></tbody></table></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Dismissed matches <span id="dismissed-count" class="muted"></span></h2>
+        <button id="reset-dismissed" class="small-btn reject">Reset all</button>
+      </div>
+      <p class="muted">Matches hidden from the Dashboard. Restore any of them individually, or reset all at once.</p>
+      <div class="table-wrap"><table id="dismissed-table"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>
