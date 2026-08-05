@@ -48,7 +48,10 @@
 
     <div class="panel">
       <div class="panel-head">
-        <h2>Seso Customer &harr; Seso Customer Matches</h2>
+        <button class="collapse-toggle" id="cc-collapse-toggle" aria-expanded="true" aria-controls="cc-body">
+          <span class="chevron">▾</span>
+          <h2>Seso Customer &harr; Seso Customer Matches</h2>
+        </button>
         <div class="controls">
           <label>Sort
             <select id="cc-sort">
@@ -60,14 +63,19 @@
           </label>
         </div>
       </div>
-      <div id="cc-total" class="muted"></div>
-      <div class="table-wrap"><table id="cc-table"><thead></thead><tbody></tbody></table></div>
-      <button id="cc-more" class="link-btn hidden">Load more</button>
+      <div id="cc-body">
+        <div id="cc-total" class="muted"></div>
+        <div class="table-wrap"><table id="cc-table"><thead></thead><tbody></tbody></table></div>
+        <button id="cc-more" class="link-btn hidden">Load more</button>
+      </div>
     </div>
 
     <div class="panel">
       <div class="panel-head">
-        <h2>Seso Customer &harr; Prospect Matches</h2>
+        <button class="collapse-toggle" id="cp-collapse-toggle" aria-expanded="true" aria-controls="cp-body">
+          <span class="chevron">▾</span>
+          <h2>Seso Customer &harr; Prospect Matches</h2>
+        </button>
         <div class="controls">
           <label>Sort
             <select id="cp-sort">
@@ -79,9 +87,11 @@
           </label>
         </div>
       </div>
-      <div id="cp-total" class="muted"></div>
-      <div class="table-wrap"><table id="cp-table"><thead></thead><tbody></tbody></table></div>
-      <button id="cp-more" class="link-btn hidden">Load more</button>
+      <div id="cp-body">
+        <div id="cp-total" class="muted"></div>
+        <div class="table-wrap"><table id="cp-table"><thead></thead><tbody></tbody></table></div>
+        <button id="cp-more" class="link-btn hidden">Load more</button>
+      </div>
     </div>
   </section>
 

@@ -245,6 +245,17 @@ function wireDashboard() {
   });
   wireDismissDelegation("cc-table", "cc");
   wireDismissDelegation("cp-table", "cp");
+  wireCollapseToggle("cc-collapse-toggle", "cc-body");
+  wireCollapseToggle("cp-collapse-toggle", "cp-body");
+}
+
+function wireCollapseToggle(toggleId, bodyId) {
+  const toggle = document.getElementById(toggleId);
+  const body = document.getElementById(bodyId);
+  toggle.addEventListener("click", () => {
+    const collapsed = body.classList.toggle("collapsed");
+    toggle.setAttribute("aria-expanded", String(!collapsed));
+  });
 }
 
 // ---------- search (quick-match by date + worker count) ----------
