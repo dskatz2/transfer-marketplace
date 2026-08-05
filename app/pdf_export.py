@@ -67,6 +67,13 @@ def _stack(main: str, sub: str | None) -> Paragraph:
     return Paragraph(text, CELL)
 
 
+def _cell(value) -> Paragraph:
+    """Every table cell must go through this (or _stack) - a plain string in a
+    reportlab Table cell does NOT wrap to fit its column the way HTML does, it
+    just overflows straight into the next cell. Only Paragraph objects wrap."""
+    return Paragraph(_xml_escape(str(value)), CELL)
+
+
 def _footer(canvas, doc):
     canvas.saveState()
     canvas.setFont("Helvetica", 8)
@@ -154,13 +161,13 @@ def _contract_history_table(contracts: list[dict], anon: Anonymizer) -> Table:
         status = "Upcoming" if end >= today else "Past"
         qualifies = "" if c.get("qualifies_for_matching") else " (< 25)"
         rows.append([
-            status,
-            Paragraph(_xml_escape(c["job_title"] or "—"), CELL),
-            anon.location(c),
-            f'{_fmt_date(c["contract_start"])} → {_fmt_date(c["contract_end"])}',
-            f'{c["worker_count"]}{qualifies}',
+            _cell(status),
+            _cell(c["job_title"] or "—"),
+            _cell(anon.location(c)),
+            _cell(f'{_fmt_date(c["contract_start"])} → {_fmt_date(c["contract_end"])}'),
+            _cell(f'{c["worker_count"]}{qualifies}'),
         ])
-    return _table(rows, [50, 150, 85, 130, 55])
+    return _table(rows, [55, 140, 80, 125, 60])
 
 
 def _matches_table(matches: list[dict], anon: Anonymizer) -> Table:
@@ -168,14 +175,14 @@ def _matches_table(matches: list[dict], anon: Anonymizer) -> Table:
     for m in matches:
         distance = f'{round(m["distance_miles"])} mi' if m.get("distance_miles") is not None else "—"
         rows.append([
-            m.get("direction", ""),
+            _cell(m.get("direction", "")),
             _stack(anon.name(m["from"]), anon.location(m["from"])),
             _stack(anon.name(m["to"]), anon.location(m["to"])),
-            f'{m["gap_days"]}d',
-            distance,
-            str(m["transferable_workers"]),
+            _cell(f'{m["gap_days"]}d'),
+            _cell(distance),
+            _cell(m["transferable_workers"]),
         ])
-    return _table(rows, [70, 130, 130, 30, 50, 50])
+    return _table(rows, [72, 122, 122, 30, 52, 48])
 
 
 def build_prospect_pdf(
@@ -274,9 +281,9 @@ def build_dashboard_pdf(
             rows.append([
                 _stack(anon.name(m["from"]), anon.location(m["from"])),
                 _stack(anon.name(m["to"]), anon.location(m["to"])),
-                f'{m["gap_days"]}d',
-                distance,
-                str(m["transferable_workers"]),
+                _cell(f'{m["gap_days"]}d'),
+                _cell(distance),
+                _cell(m["transferable_workers"]),
             ])
         return _table(rows, [155, 155, 35, 55, 55])
 
