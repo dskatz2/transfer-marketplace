@@ -283,7 +283,10 @@ def matches_summary(db: Session = Depends(get_db)):
 
 
 # ---------- Frontend ----------
-# Local dev only (uvicorn app.main:app) - on Vercel, files under public/ are
-# served directly by the platform and never hit this app at all.
+# Local dev only (uvicorn app.main:app). On Vercel, public/ isn't part of the
+# Python function's bundle at all - those files are served directly by the
+# platform and never reach this app - so only mount it when it's actually
+# there, or every cold start crashes at import time before any route runs.
 
-app.mount("/", StaticFiles(directory=PUBLIC_DIR, html=True), name="public")
+if PUBLIC_DIR.exists():
+    app.mount("/", StaticFiles(directory=PUBLIC_DIR, html=True), name="public")
