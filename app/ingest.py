@@ -200,6 +200,23 @@ def ingest_customers_csv(db: Session, file_bytes: bytes) -> dict:
     }
 
 
+def add_manual_alias(db: Session, enterprise_id: int, alias_name: str) -> models.ManualAlias:
+    """Teach the matcher that alias_name is this enterprise, regardless of how far
+    apart the fuzzy score put them. Re-pointing an existing alias to a different
+    enterprise is allowed (upsert on normalized_name) rather than erroring."""
+    normalized = normalize_name(alias_name)
+    existing = db.query(models.ManualAlias).filter_by(normalized_name=normalized).one_or_none()
+    if existing:
+        existing.enterprise_id = enterprise_id
+        existing.alias_name = alias_name
+        db.commit()
+        return existing
+    alias = models.ManualAlias(enterprise_id=enterprise_id, alias_name=alias_name, normalized_name=normalized)
+    db.add(alias)
+    db.commit()
+    return alias
+
+
 def rematch_all_contracts(db: Session) -> dict:
     """Re-runs entity resolution for every contract that hasn't been manually
     reviewed yet. Safe to call repeatedly after new uploads."""
@@ -209,6 +226,8 @@ def rematch_all_contracts(db: Session) -> dict:
         candidates.append((alias.normalized_name, alias.enterprise_id))
     for ent in db.query(models.Enterprise).all():
         candidates.append((normalize_name(ent.name), ent.id))
+    for alias in db.query(models.ManualAlias).all():
+        candidates.append((alias.normalized_name, alias.enterprise_id))
 
     auto = review = prospect = 0
     updates: list[dict] = []

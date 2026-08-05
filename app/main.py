@@ -12,7 +12,7 @@ from sqlalchemy import func
 from . import models, ingest, matching_transfers as mt
 from .auth import add_auth_middleware
 from .database import Base, engine, get_db
-from .serializers import contract_to_dict, match_to_dict, dismissed_to_dict
+from .serializers import contract_to_dict, match_to_dict, dismissed_to_dict, manual_alias_to_dict
 
 Base.metadata.create_all(bind=engine)
 
@@ -102,6 +102,61 @@ def reject_review(contract_id: int, db: Session = Depends(get_db)):
     c.match_status = "rejected"
     db.commit()
     return contract_to_dict(c)
+
+
+# ---------- Manual company aliases ----------
+# For names the fuzzy matcher scored too far apart to auto-link or even queue
+# for review (e.g. "Araona Labor" vs "ARAONA Labor Logistics, LLC") - lets a
+# human teach the matcher a permanent name mapping instead of one-off fixing
+# each contract, since the same company can recur under that exact name
+# across many filings/years.
+
+@app.get("/api/customers")
+def search_customers(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
+    like = f"%{q.lower()}%"
+    rows = (
+        db.query(models.Enterprise)
+        .filter(func.lower(models.Enterprise.name).like(like))
+        .order_by(models.Enterprise.name)
+        .limit(20)
+        .all()
+    )
+    return [{"id": e.id, "name": e.name} for e in rows]
+
+
+class AliasRequest(BaseModel):
+    enterprise_id: int
+    alias_name: str
+
+
+@app.get("/api/aliases")
+def list_aliases(db: Session = Depends(get_db)):
+    rows = db.query(models.ManualAlias).order_by(models.ManualAlias.created_at.desc()).all()
+    return [manual_alias_to_dict(a) for a in rows]
+
+
+@app.post("/api/aliases")
+def create_alias(body: AliasRequest, db: Session = Depends(get_db)):
+    name = body.alias_name.strip()
+    if not name:
+        raise HTTPException(400, "alias_name is required")
+    enterprise = db.get(models.Enterprise, body.enterprise_id)
+    if not enterprise:
+        raise HTTPException(404, "Enterprise not found")
+    alias = ingest.add_manual_alias(db, body.enterprise_id, name)
+    rematch = ingest.rematch_all_contracts(db)
+    return {"alias": manual_alias_to_dict(alias), "rematch": rematch}
+
+
+@app.post("/api/aliases/{alias_id}/delete")
+def delete_alias(alias_id: int, db: Session = Depends(get_db)):
+    alias = db.get(models.ManualAlias, alias_id)
+    if not alias:
+        raise HTTPException(404, "Alias not found")
+    db.delete(alias)
+    db.commit()
+    rematch = ingest.rematch_all_contracts(db)
+    return {"deleted": alias_id, "rematch": rematch}
 
 
 # ---------- Dashboard match sections ----------

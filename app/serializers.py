@@ -53,3 +53,12 @@ def dismissed_to_dict(d: models.DismissedMatch) -> dict:
         "from_contract": contract_to_dict(d.from_contract) if d.from_contract else None,
         "to_contract": contract_to_dict(d.to_contract) if d.to_contract else None,
     }
+
+
+def manual_alias_to_dict(a: models.ManualAlias) -> dict:
+    return {
+        "id": a.id,
+        "alias_name": a.alias_name,
+        "created_at": a.created_at.isoformat() if a.created_at else None,
+        "enterprise": {"id": a.enterprise.id, "name": a.enterprise.name} if a.enterprise else None,
+    }

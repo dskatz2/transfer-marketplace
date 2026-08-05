@@ -450,6 +450,138 @@ function wireAdmin() {
   });
 }
 
+// ---------- company aliases ----------
+
+let aliasDebounce = null;
+let selectedAliasCustomer = null;
+
+function wireAliasForm() {
+  const nameInput = document.getElementById("alias-name-input");
+  const nameSuggestions = document.getElementById("alias-name-suggestions");
+  const customerInput = document.getElementById("alias-customer-input");
+  const customerSuggestions = document.getElementById("alias-customer-suggestions");
+  const errBox = document.getElementById("alias-error");
+
+  nameInput.addEventListener("input", () => {
+    clearTimeout(aliasDebounce);
+    const q = nameInput.value.trim();
+    if (q.length < 2) { nameSuggestions.classList.add("hidden"); return; }
+    aliasDebounce = setTimeout(async () => {
+      const r = await fetch(`/api/search/employers?q=${encodeURIComponent(q)}`);
+      const items = await r.json();
+      if (!items.length) { nameSuggestions.classList.add("hidden"); return; }
+      nameSuggestions.innerHTML = items.map((it) => `
+        <div class="suggestion-item" data-name="${escapeHtml(it.employer_name)}">
+          <span>${escapeHtml(it.employer_name)}</span>
+          ${it.is_customer ? '<span class="pill pill-customer">Already a customer match</span>' : '<span class="pill pill-prospect">Prospect</span>'}
+        </div>
+      `).join("");
+      nameSuggestions.classList.remove("hidden");
+    }, 250);
+  });
+  nameSuggestions.addEventListener("click", (e) => {
+    const item = e.target.closest(".suggestion-item");
+    if (!item) return;
+    nameInput.value = item.dataset.name;
+    nameSuggestions.classList.add("hidden");
+  });
+
+  customerInput.addEventListener("input", () => {
+    selectedAliasCustomer = null;
+    clearTimeout(aliasDebounce);
+    const q = customerInput.value.trim();
+    if (q.length < 1) { customerSuggestions.classList.add("hidden"); return; }
+    aliasDebounce = setTimeout(async () => {
+      const r = await fetch(`/api/customers?q=${encodeURIComponent(q)}`);
+      const items = await r.json();
+      if (!items.length) { customerSuggestions.classList.add("hidden"); return; }
+      customerSuggestions.innerHTML = items.map((it) => `
+        <div class="suggestion-item" data-id="${it.id}" data-name="${escapeHtml(it.name)}">
+          <span>${escapeHtml(it.name)}</span>
+        </div>
+      `).join("");
+      customerSuggestions.classList.remove("hidden");
+    }, 250);
+  });
+  customerSuggestions.addEventListener("click", (e) => {
+    const item = e.target.closest(".suggestion-item");
+    if (!item) return;
+    customerInput.value = item.dataset.name;
+    selectedAliasCustomer = Number(item.dataset.id);
+    customerSuggestions.classList.add("hidden");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("#alias-name-input, #alias-name-suggestions")) nameSuggestions.classList.add("hidden");
+    if (!e.target.closest("#alias-customer-input, #alias-customer-suggestions")) customerSuggestions.classList.add("hidden");
+  });
+
+  document.getElementById("create-alias").addEventListener("click", async () => {
+    errBox.classList.add("hidden");
+    const aliasName = nameInput.value.trim();
+    if (!aliasName) {
+      errBox.textContent = "Enter the disclosure employer name.";
+      errBox.classList.remove("hidden");
+      return;
+    }
+    if (!selectedAliasCustomer) {
+      errBox.textContent = "Pick a Seso customer from the suggestions list.";
+      errBox.classList.remove("hidden");
+      return;
+    }
+    const r = await fetch("/api/aliases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enterprise_id: selectedAliasCustomer, alias_name: aliasName }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      errBox.textContent = data.detail || "Could not create the alias.";
+      errBox.classList.remove("hidden");
+      return;
+    }
+    nameInput.value = "";
+    customerInput.value = "";
+    selectedAliasCustomer = null;
+    state.cc.offset = 0; state.cp.offset = 0;
+    await Promise.all([
+      loadAliasList(), loadStats(), loadSummary(), loadSection("cc"), loadSection("cp"), loadReviewQueue(),
+    ]);
+  });
+}
+
+async function loadAliasList() {
+  const r = await fetch("/api/aliases");
+  const items = await r.json();
+  document.getElementById("alias-count").textContent = items.length ? `(${items.length})` : "";
+  const table = document.getElementById("alias-table");
+  table.querySelector("thead").innerHTML = `<tr><th>Disclosure name</th><th>Linked to</th><th>Added</th><th></th></tr>`;
+  const tbody = table.querySelector("tbody");
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="4" class="muted">No manual aliases yet.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = items.map((a) => `
+    <tr data-id="${a.id}">
+      <td class="entity-name">${escapeHtml(a.alias_name)}</td>
+      <td>${a.enterprise ? escapeHtml(a.enterprise.name) : ""}</td>
+      <td class="sub">${a.created_at ? fmtDate(a.created_at.slice(0, 10)) : ""}</td>
+      <td><button class="small-btn reject" data-action="remove">Remove</button></td>
+    </tr>
+  `).join("");
+
+  tbody.querySelectorAll('button[data-action="remove"]').forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.closest("tr").dataset.id;
+      await fetch(`/api/aliases/${id}/delete`, { method: "POST" });
+      state.cc.offset = 0; state.cp.offset = 0;
+      await Promise.all([
+        loadAliasList(), loadStats(), loadSummary(), loadSection("cc"), loadSection("cp"), loadReviewQueue(),
+      ]);
+    });
+  });
+}
+
 async function loadReviewQueue() {
   const r = await fetch("/api/review-queue");
   const items = await r.json();
@@ -537,7 +669,7 @@ function wireTabs() {
 async function refreshAll() {
   await Promise.all([
     loadStats(), loadSummary(), loadSection("cc"), loadSection("cp"),
-    loadReviewQueue(), loadDismissedList(),
+    loadReviewQueue(), loadDismissedList(), loadAliasList(),
   ]);
 }
 
@@ -545,4 +677,5 @@ wireTabs();
 wireDashboard();
 wireSearch();
 wireAdmin();
+wireAliasForm();
 refreshAll();

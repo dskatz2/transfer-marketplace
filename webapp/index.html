@@ -179,6 +179,26 @@
     </div>
 
     <div class="panel">
+      <h2>Company aliases <span id="alias-count" class="muted"></span></h2>
+      <p class="muted">For names too different for the matcher to catch on its own or even queue for review (e.g. "Araona Labor" vs "ARAONA Labor Logistics, LLC"). Teach it once and every filing under that exact name &mdash; past or future &mdash; links to that customer automatically.</p>
+      <div class="form-row alias-form">
+        <label class="search-row">
+          <span class="field-label">Disclosure employer name</span>
+          <input type="text" id="alias-name-input" placeholder="Start typing an employer name&hellip;" autocomplete="off">
+          <div id="alias-name-suggestions" class="suggestions hidden"></div>
+        </label>
+        <label class="search-row">
+          <span class="field-label">Is actually this Seso customer</span>
+          <input type="text" id="alias-customer-input" placeholder="Start typing a customer name&hellip;" autocomplete="off">
+          <div id="alias-customer-suggestions" class="suggestions hidden"></div>
+        </label>
+      </div>
+      <div id="alias-error" class="error-text hidden"></div>
+      <button id="create-alias" class="primary-btn">Link them</button>
+      <div class="table-wrap alias-table-wrap"><table id="alias-table"><thead></thead><tbody></tbody></table></div>
+    </div>
+
+    <div class="panel">
       <div class="panel-head">
         <h2>Dismissed matches <span id="dismissed-count" class="muted"></span></h2>
         <button id="reset-dismissed" class="small-btn reject">Reset all</button>

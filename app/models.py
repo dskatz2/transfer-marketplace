@@ -42,6 +42,26 @@ class EntityAlias(Base):
     enterprise = relationship("Enterprise", back_populates="aliases")
 
 
+class ManualAlias(Base):
+    """A user-taught 'this disclosure name is actually this customer' mapping, for
+    cases where the fuzzy matcher scored two names too far apart to auto-link or
+    even queue for review (e.g. 'Araona Labor' vs 'ARAONA Labor Logistics, LLC').
+    Kept separate from EntityAlias (CSV-sourced) so a customer-list re-upload can
+    never silently overwrite or collide with something a human corrected."""
+
+    __tablename__ = "manual_aliases"
+
+    id = Column(Integer, primary_key=True)
+    enterprise_id = Column(Integer, ForeignKey("enterprises.id"), nullable=False)
+    alias_name = Column(String, nullable=False)
+    normalized_name = Column(String, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    enterprise = relationship("Enterprise")
+
+    __table_args__ = (UniqueConstraint("normalized_name", name="uq_manual_alias_normalized"),)
+
+
 class Contract(Base):
     """One job-order record from the H-2A disclosure data (one worksite/job per row)."""
 

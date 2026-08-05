@@ -22,7 +22,13 @@ Then open http://localhost:8811.
    list is fully refreshed).
 2. Review queue — employer names that fuzzy-matched a Seso customer with medium
    confidence (78–92%) land here for a human call. Above 92% auto-confirms;
-   below 78% is treated as a prospect.
+   below 78% is treated as a prospect and never even reaches this queue.
+2b. **Company aliases** (Admin) — for names too different for the matcher to
+    catch at all (e.g. "Araona Labor" vs "ARAONA Labor Logistics, LLC", which
+    scored 70% — below the review-queue threshold). Pick the disclosure name
+    and the real Seso customer it actually is; every filing under that exact
+    name, past or future, links automatically from then on. Removable if you
+    made a mistake.
 3. **Dashboard tab** — a "best matches right now" panel (KPIs + charts), plus
    Seso Customer ↔ Seso Customer and Seso Customer ↔ Prospect match tables,
    sortable by workers/gap/soonest/**distance**. Each row has a **Dismiss**

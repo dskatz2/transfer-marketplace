@@ -368,3 +368,8 @@ tbody tr:hover { background: var(--row-hover); }
   cursor: pointer;
 }
 .dismiss-btn:hover { border-color: var(--danger); color: var(--danger); background: var(--row-hover); }
+
+/* ---------- Aliases ---------- */
+.alias-form { align-items: flex-start; }
+.alias-form .search-row { flex: 1 1 300px; max-width: none; }
+.alias-table-wrap { margin-top: 16px; }
