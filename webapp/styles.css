@@ -154,6 +154,7 @@ select, input[type="text"] {
 }
 
 .muted { color: var(--muted); font-size: 12px; margin: 4px 0 12px; }
+.inline-hint { margin: 0; font-size: 11px; }
 
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
