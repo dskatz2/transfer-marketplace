@@ -19,7 +19,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(title="H-2A Transfer Matcher")
 add_auth_middleware(app)
 
-PUBLIC_DIR = Path(__file__).parent.parent / "public"
+PUBLIC_DIR = Path(__file__).parent.parent / "webapp"
 
 
 # ---------- Uploads ----------
@@ -290,10 +290,13 @@ def matches_summary(db: Session = Depends(get_db)):
 
 
 # ---------- Frontend ----------
-# Local dev only (uvicorn app.main:app). On Vercel, public/ isn't part of the
-# Python function's bundle at all - those files are served directly by the
-# platform and never reach this app - so only mount it when it's actually
-# there, or every cold start crashes at import time before any route runs.
+# Deliberately NOT named "public/" - Vercel treats that directory name as a
+# reserved convention and publishes its contents directly at the edge,
+# bypassing this app (and therefore the auth middleware above) entirely.
+# Bundled into the function via vercel.json's includeFiles instead, and
+# served from here so Basic Auth actually applies to it. Guarded by
+# .exists() so local dev (where it's always present) and Vercel (where it's
+# only present because includeFiles put it there) both work the same way.
 
 if PUBLIC_DIR.exists():
-    app.mount("/", StaticFiles(directory=PUBLIC_DIR, html=True), name="public")
+    app.mount("/", StaticFiles(directory=PUBLIC_DIR, html=True), name="webapp")
