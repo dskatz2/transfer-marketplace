@@ -110,6 +110,8 @@ _SORT_KEYS = {
     "workers": lambda m: -m.transferable_workers,
     "gap": lambda m: m.gap_days,
     "soonest": lambda m: m.to_window.start,
+    # Unknown distance (missing city/state data) sorts last, not first.
+    "distance": lambda m: (m.distance_miles is None, m.distance_miles or 0),
 }
 
 
@@ -179,11 +181,16 @@ def quick_match(
     contract_date: date = Query(..., description="Contract start date for 'needs workers', end date for 'save transportation'"),
     mode: str = Query(..., pattern="^(needs_workers|save_transportation)$"),
     employer_name: Optional[str] = Query(None),
+    worksite_city: Optional[str] = Query(None),
+    worksite_state: Optional[str] = Query(None),
+    sort: str = Query("workers"),
     db: Session = Depends(get_db),
 ):
     if worker_count < mt.MIN_WORKERS:
         raise HTTPException(400, f"H-2A transfer matches only apply to contracts of {mt.MIN_WORKERS}+ workers.")
-    prospect, matches = mt.quick_match(db, worker_count, mode, contract_date, employer_name)
+    prospect, matches = mt.quick_match(db, worker_count, mode, contract_date, employer_name, worksite_city, worksite_state)
+    key = _SORT_KEYS.get(sort, _SORT_KEYS["workers"])
+    matches = sorted(matches, key=key)
     return {"prospect": contract_to_dict(prospect), "results": [match_to_dict(m) for m in matches]}
 
 

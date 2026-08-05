@@ -48,6 +48,7 @@
               <option value="workers">Most workers</option>
               <option value="gap">Smallest gap</option>
               <option value="soonest">Soonest</option>
+              <option value="distance">Closest</option>
             </select>
           </label>
         </div>
@@ -66,6 +67,7 @@
               <option value="workers">Most workers</option>
               <option value="gap">Smallest gap</option>
               <option value="soonest">Soonest</option>
+              <option value="distance">Closest</option>
             </select>
           </label>
         </div>
@@ -116,12 +118,33 @@
             <input type="number" id="quick-workers" min="1" step="1" placeholder="e.g. 40">
           </label>
         </div>
+        <div class="form-row">
+          <label>
+            Worksite city <span class="muted">(optional &mdash; enables distance)</span>
+            <input type="text" id="quick-city" placeholder="e.g. Othello">
+          </label>
+          <label>
+            Worksite state
+            <input type="text" id="quick-state" placeholder="e.g. WA" maxlength="2" style="text-transform: uppercase;">
+          </label>
+        </div>
         <div id="quick-match-error" class="error-text hidden"></div>
         <button id="run-search" class="primary-btn">Search</button>
       </div>
 
       <div id="search-results" class="hidden">
-        <h3 id="search-results-title"></h3>
+        <div class="panel-head">
+          <h3 id="search-results-title"></h3>
+          <div class="controls">
+            <label>Sort
+              <select id="search-sort">
+                <option value="workers">Most workers</option>
+                <option value="gap">Smallest gap</option>
+                <option value="distance">Closest</option>
+              </select>
+            </label>
+          </div>
+        </div>
         <div class="table-wrap"><table id="search-table"><thead></thead><tbody></tbody></table></div>
       </div>
     </div>

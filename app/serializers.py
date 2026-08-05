@@ -41,6 +41,7 @@ def match_to_dict(m: TransferMatch) -> dict:
         "gap_days": m.gap_days,
         "transferable_workers": m.transferable_workers,
         "is_projected": m.is_projected,
+        "distance_miles": m.distance_miles,
         "dismissable": m.from_contract.id is not None and m.to_contract.id is not None,
     }
 

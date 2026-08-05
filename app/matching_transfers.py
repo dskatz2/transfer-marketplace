@@ -16,6 +16,7 @@ from datetime import date, timedelta
 from sqlalchemy.orm import Session
 
 from . import models
+from .geo import distance_miles as _distance_miles
 from .matching_entities import normalize_name
 
 MIN_WORKERS = 25
@@ -78,6 +79,13 @@ class TransferMatch:
     @property
     def is_projected(self) -> bool:
         return self.from_window.is_projected or self.to_window.is_projected
+
+    @property
+    def distance_miles(self) -> float | None:
+        return _distance_miles(
+            self.from_contract.worksite_city, self.from_contract.worksite_state,
+            self.to_contract.worksite_city, self.to_contract.worksite_state,
+        )
 
 
 def _eligible_contracts(db: Session, today: date) -> list[EffectiveWindow]:
@@ -202,7 +210,10 @@ def search_save_outbound_transportation(
     return out
 
 
-def build_quick_match_contract(worker_count: int, target_date: date, employer_name: str | None = None) -> AdHocContract:
+def build_quick_match_contract(
+    worker_count: int, target_date: date, employer_name: str | None = None,
+    worksite_city: str | None = None, worksite_state: str | None = None,
+) -> AdHocContract:
     label = (employer_name or "").strip() or "New prospect"
     return AdHocContract(
         employer_name=label,
@@ -210,15 +221,18 @@ def build_quick_match_contract(worker_count: int, target_date: date, employer_na
         worker_count=worker_count,
         contract_start=target_date,
         contract_end=target_date,
+        worksite_city=(worksite_city or "").strip() or None,
+        worksite_state=(worksite_state or "").strip() or None,
     )
 
 
 def quick_match(
     db: Session, worker_count: int, mode: str, target_date: date,
-    employer_name: str | None = None, today: date | None = None,
+    employer_name: str | None = None, worksite_city: str | None = None,
+    worksite_state: str | None = None, today: date | None = None,
 ) -> tuple[AdHocContract, list[TransferMatch]]:
     """Search by hand-typed date + worker count instead of an existing filed contract."""
-    prospect = build_quick_match_contract(worker_count, target_date, employer_name)
+    prospect = build_quick_match_contract(worker_count, target_date, employer_name, worksite_city, worksite_state)
     if mode == "needs_workers":
         matches = search_needs_workers(db, prospect, today, project_prospect=False)
     else:

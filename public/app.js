@@ -37,6 +37,11 @@ function partyCell(contract, dateField, isProjected) {
   `;
 }
 
+function fmtDistance(miles) {
+  if (miles === null || miles === undefined) return `<span class="muted">unknown</span>`;
+  return `${Math.round(miles).toLocaleString()} mi`;
+}
+
 function matchRowHtml(m) {
   const dismissBtn = m.dismissable
     ? `<button class="dismiss-btn" data-from="${m.from.id}" data-to="${m.to.id}">Dismiss</button>`
@@ -47,6 +52,7 @@ function matchRowHtml(m) {
       <td>${partyCell(m.to, "effective_start", m.to.is_projected)}</td>
       <td>${m.gap_days}</td>
       <td><strong>${m.transferable_workers}</strong></td>
+      <td>${fmtDistance(m.distance_miles)}</td>
       <td>${dismissBtn}</td>
     </tr>
   `;
@@ -56,10 +62,10 @@ function renderMatchTable(tableId, matches, append) {
   const table = document.getElementById(tableId);
   const thead = table.querySelector("thead");
   const tbody = table.querySelector("tbody");
-  thead.innerHTML = `<tr><th>Ending contract</th><th>Starting contract</th><th>Gap (days)</th><th>Transferable workers</th><th></th></tr>`;
+  thead.innerHTML = `<tr><th>Ending contract</th><th>Starting contract</th><th>Gap (days)</th><th>Transferable workers</th><th>Distance</th><th></th></tr>`;
   const rowsHtml = matches.map(matchRowHtml).join("");
   if (append) tbody.insertAdjacentHTML("beforeend", rowsHtml);
-  else tbody.innerHTML = rowsHtml || `<tr><td colspan="5" class="muted">No matches found.</td></tr>`;
+  else tbody.innerHTML = rowsHtml || `<tr><td colspan="6" class="muted">No matches found.</td></tr>`;
 }
 
 // ---------- SVG chart helpers ----------
@@ -293,6 +299,9 @@ function wireSearch() {
   updateDateFieldLabel();
 
   document.getElementById("run-search").addEventListener("click", runSearch);
+  document.getElementById("search-sort").addEventListener("change", () => {
+    if (!document.getElementById("search-results").classList.contains("hidden")) runSearch();
+  });
 }
 
 async function loadEmployerContracts(name) {
@@ -306,7 +315,7 @@ async function loadEmployerContracts(name) {
     return;
   }
   list.innerHTML = contracts.map((c) => `
-    <div class="contract-option" data-start="${c.contract_start}" data-end="${c.contract_end}" data-workers="${c.worker_count}">
+    <div class="contract-option" data-start="${c.contract_start}" data-end="${c.contract_end}" data-workers="${c.worker_count}" data-city="${escapeHtml(c.worksite_city || "")}" data-state="${escapeHtml(c.worksite_state || "")}">
       <div class="title">${escapeHtml(c.job_title || "Contract")} &mdash; ${escapeHtml(c.worksite_city || "")}${c.worksite_state ? ", " + c.worksite_state : ""}</div>
       <div class="sub">${fmtDate(c.contract_start)} &rarr; ${fmtDate(c.contract_end)} &middot; ${c.worker_count} workers</div>
     </div>
@@ -320,6 +329,8 @@ async function loadEmployerContracts(name) {
       const mode = document.querySelector('input[name="mode"]:checked').value;
       document.getElementById("quick-date").value = mode === "needs_workers" ? el.dataset.start : el.dataset.end;
       document.getElementById("quick-workers").value = el.dataset.workers;
+      document.getElementById("quick-city").value = el.dataset.city || "";
+      document.getElementById("quick-state").value = el.dataset.state || "";
     });
   });
 }
@@ -332,6 +343,9 @@ async function runSearch() {
   const workersVal = document.getElementById("quick-workers").value;
   const mode = document.querySelector('input[name="mode"]:checked').value;
   const employerName = document.getElementById("prospect-input").value.trim();
+  const cityVal = document.getElementById("quick-city").value.trim();
+  const stateVal = document.getElementById("quick-state").value.trim();
+  const sortVal = document.getElementById("search-sort").value;
 
   if (!dateVal || !workersVal) {
     errBox.textContent = "Enter both a date and a worker count.";
@@ -344,8 +358,10 @@ async function runSearch() {
     return;
   }
 
-  const params = new URLSearchParams({ worker_count: workersVal, contract_date: dateVal, mode });
+  const params = new URLSearchParams({ worker_count: workersVal, contract_date: dateVal, mode, sort: sortVal });
   if (employerName) params.set("employer_name", employerName);
+  if (cityVal) params.set("worksite_city", cityVal);
+  if (stateVal) params.set("worksite_state", stateVal);
 
   const r = await fetch(`/api/search/quick-match?${params.toString()}`);
   const data = await r.json();
