@@ -332,12 +332,16 @@ function contractCardHtml(c) {
   const qualifies = c.qualifies_for_matching
     ? `<span class="pill pill-customer">Qualifies (25+)</span>`
     : `<span class="pill pill-prospect">Below 25-worker threshold</span>`;
+  const projected = c.is_projected ? `<span class="pill pill-projected">Projected</span>` : "";
+  const caseInfo = c.is_projected
+    ? `Estimated from ${escapeHtml(c.case_number)} (last cycle)`
+    : escapeHtml(c.case_number);
   return `
     <details class="contract-card">
       <summary>
         <div class="contract-summary-main">
           <div>
-            <div class="entity-name">${escapeHtml(c.job_title || "Contract")}</div>
+            <div class="entity-name">${escapeHtml(c.job_title || "Contract")} ${projected}</div>
             <div class="sub">${escapeHtml(c.worksite_city || "")}${c.worksite_state ? ", " + c.worksite_state : ""} &middot; ${fmtDate(c.contract_start)} &rarr; ${fmtDate(c.contract_end)}</div>
           </div>
         </div>
@@ -351,7 +355,7 @@ function contractCardHtml(c) {
           <div><span class="muted">Wage offer</span><div>${fmtWage(c)}</div></div>
           <div><span class="muted">Hours offered</span><div>${fmtHours(c)}</div></div>
           <div><span class="muted">Case status</span><div>${escapeHtml(c.case_status || "")}</div></div>
-          <div><span class="muted">Case number</span><div>${escapeHtml(c.case_number)}</div></div>
+          <div><span class="muted">Case number</span><div>${caseInfo}</div></div>
         </div>
         <button class="small-btn approve use-for-search" data-id="${c.id}">Use this contract to search matches</button>
       </div>
@@ -384,18 +388,24 @@ async function loadEmployerContracts(name) {
   const box = document.getElementById("prospect-profile");
   document.getElementById("profile-company-name").textContent = `— ${name}`;
 
+  const currentList = document.getElementById("profile-current-list");
   const upcomingList = document.getElementById("profile-upcoming-list");
   const pastList = document.getElementById("profile-past-list");
+  document.getElementById("profile-current-count").textContent = `(${data.current.length})`;
   document.getElementById("profile-upcoming-count").textContent = `(${data.upcoming.length})`;
   document.getElementById("profile-past-count").textContent = `(${data.past.length})`;
 
+  currentList.innerHTML = data.current.length
+    ? data.current.map(contractCardHtml).join("")
+    : `<div class="no-history">Nothing ongoing right now.</div>`;
   upcomingList.innerHTML = data.upcoming.length
     ? data.upcoming.map(contractCardHtml).join("")
-    : `<div class="no-history">No upcoming filings on record.</div>`;
+    : `<div class="no-history">No upcoming or projected filings.</div>`;
   pastList.innerHTML = data.past.length
     ? data.past.map(contractCardHtml).join("")
     : `<div class="no-history">No past filings on record.</div>`;
 
+  wireProfileUseButtons(currentList);
   wireProfileUseButtons(upcomingList);
   wireProfileUseButtons(pastList);
   box.classList.remove("hidden");
@@ -413,8 +423,8 @@ async function runSearch() {
   const stateVal = document.getElementById("quick-state").value.trim();
   const sortVal = document.getElementById("search-sort").value;
 
-  if (!dateVal || !workersVal) {
-    errBox.textContent = "Enter both a date and a worker count.";
+  if (!workersVal) {
+    errBox.textContent = "Enter a worker count.";
     errBox.classList.remove("hidden");
     return;
   }
@@ -424,7 +434,8 @@ async function runSearch() {
     return;
   }
 
-  const params = new URLSearchParams({ worker_count: workersVal, contract_date: dateVal, mode, sort: sortVal });
+  const params = new URLSearchParams({ worker_count: workersVal, mode, sort: sortVal });
+  if (dateVal) params.set("contract_date", dateVal);
   if (employerName) params.set("employer_name", employerName);
   if (cityVal) params.set("worksite_city", cityVal);
   if (stateVal) params.set("worksite_state", stateVal);
@@ -438,9 +449,16 @@ async function runSearch() {
   }
 
   const label = escapeHtml(data.prospect.employer_name);
-  const title = mode === "needs_workers"
-    ? `Seso customers whose workers could transfer into ${label}'s contract`
-    : `Seso customers who could take ${label}'s workers next, saving outbound transportation`;
+  let title;
+  if (data.browse_mode) {
+    title = mode === "needs_workers"
+      ? `Seso customers with workers becoming available &mdash; no date given, showing every possibility`
+      : `Seso customers who could take on workers &mdash; no date given, showing every possibility`;
+  } else {
+    title = mode === "needs_workers"
+      ? `Seso customers whose workers could transfer into ${label}'s contract`
+      : `Seso customers who could take ${label}'s workers next, saving outbound transportation`;
+  }
   document.getElementById("search-results-title").innerHTML = title;
   renderMatchTable("search-table", data.results, false);
   document.getElementById("search-results").classList.remove("hidden");

@@ -34,14 +34,18 @@ Then open http://localhost:8811.
    sortable by workers/gap/soonest/**distance**. Each row has a **Dismiss**
    button; dismissed matches can be restored individually or all at once from
    Admin.
-4. **Search tab** — type a contract date and worker count directly (works for a
-   brand-new prospect that isn't in the disclosure data at all), or search a
-   company by name to browse its **full contract history** first — every filing
-   on record (any worker count, not just 25+), split into Upcoming/Past,
-   expandable per-contract for wage offer/hours/case status. Expand one and hit
-   "Use this contract to search matches" to prefill the form, or fill it in by
-   hand. Choose "Needs workers" or "Save on outbound transportation" to see
-   which Seso customers line up, sortable the same way as the dashboard.
+4. **Search tab** — search a company by name to browse its **full contract
+   history**: every filing on record (any worker count, not just 25+), split
+   into Current/Upcoming/Past. Every fully-ended contract also gets a
+   "Projected" entry in Upcoming, estimated one year out — the same next-cycle
+   rollover the dashboard uses for matching. Expand any card for wage
+   offer/hours/case status, and hit "Use this contract to search matches" to
+   prefill the form below, or just type numbers in yourself. Worker count is
+   the only required field — **the date is optional**: leave it blank to
+   browse every qualifying possibility instead of one specific 30-day window
+   (useful when you don't have an exact date from the prospect yet). Choose
+   "Needs workers" or "Save on outbound transportation" either way, sortable
+   the same way as the dashboard.
 5. **Export PDF** — from Search (after looking up a company) or from the
    Dashboard, generate a branded PDF: contract history + matching opportunities
    for one company, or the top overall matches across everyone. Two checkboxes

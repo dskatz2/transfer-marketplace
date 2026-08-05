@@ -1,6 +1,6 @@
 import re
 from collections import Counter
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -223,9 +223,15 @@ def search_employers(q: str = Query(..., min_length=2), db: Session = Depends(ge
 @app.get("/api/search/employer-contracts")
 def employer_contracts(employer_name: str, db: Session = Depends(get_db)):
     """Full contract history for one employer - every filing regardless of
-    worker count, split into past/upcoming, for the Search tab's company
-    profile view. (Matching itself still only considers 25+-worker contracts;
-    each entry here is flagged with qualifies_for_matching so that's visible.)"""
+    worker count, split into past/current/upcoming, for the Search tab's
+    company profile view. (Matching itself still only considers 25+-worker
+    contracts; each entry here is flagged with qualifies_for_matching so
+    that's visible.)
+
+    Every past (fully-ended) contract also gets a synthetic "Projected" entry
+    in upcoming, shifted +365 days - the same next-cycle estimate the
+    dashboard already shows for matching, so a company's history reads the
+    same way whether you're browsing it or seeing it in a match."""
     contracts = (
         db.query(models.Contract)
         .filter(models.Contract.employer_name == employer_name)
@@ -233,16 +239,34 @@ def employer_contracts(employer_name: str, db: Session = Depends(get_db)):
         .all()
     )
     today = date.today()
-    past = [contract_to_dict(c) for c in contracts if c.contract_end < today]
-    upcoming = [contract_to_dict(c) for c in contracts if c.contract_end >= today]
+    past, current, upcoming = [], [], []
+    for c in contracts:
+        d = contract_to_dict(c)
+        d["is_projected"] = False
+        if c.contract_end < today:
+            past.append(d)
+            proj = dict(d)
+            proj["id"] = f"projected-{c.id}"
+            proj["contract_start"] = (c.contract_start + timedelta(days=365)).isoformat()
+            proj["contract_end"] = (c.contract_end + timedelta(days=365)).isoformat()
+            proj["is_projected"] = True
+            upcoming.append(proj)
+        elif c.contract_start <= today:
+            current.append(d)
+        else:
+            upcoming.append(d)
     upcoming.sort(key=lambda c: c["contract_start"])
-    return {"past": past, "upcoming": upcoming}
+    current.sort(key=lambda c: c["contract_end"])
+    return {"past": past, "current": current, "upcoming": upcoming}
 
 
 @app.get("/api/search/quick-match")
 def quick_match(
     worker_count: int = Query(..., ge=1),
-    contract_date: date = Query(..., description="Contract start date for 'needs workers', end date for 'save transportation'"),
+    contract_date: Optional[date] = Query(
+        None, description="Contract start date for 'needs workers', end date for 'save transportation'. "
+                           "Omit to browse all qualifying matches without a date constraint."
+    ),
     mode: str = Query(..., pattern="^(needs_workers|save_transportation)$"),
     employer_name: Optional[str] = Query(None),
     worksite_city: Optional[str] = Query(None),
@@ -255,7 +279,11 @@ def quick_match(
     prospect, matches = mt.quick_match(db, worker_count, mode, contract_date, employer_name, worksite_city, worksite_state)
     key = _SORT_KEYS.get(sort, _SORT_KEYS["workers"])
     matches = sorted(matches, key=key)
-    return {"prospect": contract_to_dict(prospect), "results": [match_to_dict(m) for m in matches]}
+    return {
+        "prospect": contract_to_dict(prospect),
+        "results": [match_to_dict(m) for m in matches],
+        "browse_mode": contract_date is None,
+    }
 
 
 # ---------- Dismiss / restore ----------

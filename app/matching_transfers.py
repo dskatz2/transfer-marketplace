@@ -229,12 +229,61 @@ def build_quick_match_contract(
     )
 
 
+def browse_matches(
+    db: Session, worker_count: int, mode: str, employer_name: str | None = None,
+    worksite_city: str | None = None, worksite_state: str | None = None,
+    today: date | None = None,
+) -> tuple[AdHocContract, list[TransferMatch]]:
+    """No specific date given - show every qualifying Seso customer contract
+    that hasn't already happened, instead of one narrow +/-30-day window.
+    gap_days here means "days from today until this customer's relevant
+    date" (their contract end for needs_workers, start for save_transportation)
+    - not a gap between two dates, since there's no second date to compare to."""
+    today = today or date.today()
+    if worker_count < MIN_WORKERS:
+        return build_quick_match_contract(worker_count, today, employer_name, worksite_city, worksite_state), []
+
+    prospect = build_quick_match_contract(worker_count, today, employer_name, worksite_city, worksite_state)
+    prospect_window = EffectiveWindow(prospect, today, today, False)
+    windows = _eligible_contracts(db, today)
+
+    out = []
+    for w in windows:
+        if w.contract.enterprise_id is None:
+            continue
+        if _same_employer(w.contract, prospect):
+            continue
+        reference = w.end if mode == "needs_workers" else w.start
+        days_from_today = (reference - today).days
+        if days_from_today < 0:
+            continue
+        transferable = min(worker_count, w.contract.worker_count)
+        if mode == "needs_workers":
+            out.append(TransferMatch(
+                from_contract=w.contract, to_contract=prospect,
+                from_window=w, to_window=prospect_window,
+                gap_days=days_from_today, transferable_workers=transferable,
+            ))
+        else:
+            out.append(TransferMatch(
+                from_contract=prospect, to_contract=w.contract,
+                from_window=prospect_window, to_window=w,
+                gap_days=days_from_today, transferable_workers=transferable,
+            ))
+    out.sort(key=lambda m: -m.transferable_workers)
+    return prospect, out
+
+
 def quick_match(
-    db: Session, worker_count: int, mode: str, target_date: date,
+    db: Session, worker_count: int, mode: str, target_date: date | None = None,
     employer_name: str | None = None, worksite_city: str | None = None,
     worksite_state: str | None = None, today: date | None = None,
 ) -> tuple[AdHocContract, list[TransferMatch]]:
-    """Search by hand-typed date + worker count instead of an existing filed contract."""
+    """Search by hand-typed worker count, with or without a specific date.
+    With no date, delegates to browse_matches (see there for what changes)."""
+    if target_date is None:
+        return browse_matches(db, worker_count, mode, employer_name, worksite_city, worksite_state, today)
+
     prospect = build_quick_match_contract(worker_count, target_date, employer_name, worksite_city, worksite_state)
     if mode == "needs_workers":
         matches = search_needs_workers(db, prospect, today, project_prospect=False)

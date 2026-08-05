@@ -110,7 +110,11 @@
       <div id="prospect-profile" class="hidden">
         <h3>Contract history <span id="profile-company-name" class="muted"></span></h3>
         <div class="profile-group">
-          <h4>Upcoming <span id="profile-upcoming-count" class="muted"></span></h4>
+          <h4>Current <span id="profile-current-count" class="muted"></span></h4>
+          <div id="profile-current-list"></div>
+        </div>
+        <div class="profile-group">
+          <h4>Upcoming <span class="muted">(includes projected next-cycle estimates)</span> <span id="profile-upcoming-count" class="muted"></span></h4>
           <div id="profile-upcoming-list"></div>
         </div>
         <div class="profile-group">
@@ -138,9 +142,10 @@
           </label>
         </div>
 
+        <p class="muted">Leave the date blank to browse every possibility instead of one specific window.</p>
         <div class="form-row">
           <label>
-            <span id="date-field-label">Contract start date</span>
+            <span><span id="date-field-label">Contract start date</span> <span class="muted inline-hint">(optional)</span></span>
             <input type="date" id="quick-date">
           </label>
           <label>
