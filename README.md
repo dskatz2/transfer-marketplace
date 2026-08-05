@@ -25,12 +25,14 @@ Then open http://localhost:8811.
    below 78% is treated as a prospect.
 3. **Dashboard tab** — a "best matches right now" panel (KPIs + charts), plus
    Seso Customer ↔ Seso Customer and Seso Customer ↔ Prospect match tables,
-   sortable by workers/gap/soonest. Each row has a **Dismiss** button; dismissed
-   matches can be restored individually or all at once from Admin.
+   sortable by workers/gap/soonest/**distance**. Each row has a **Dismiss**
+   button; dismissed matches can be restored individually or all at once from
+   Admin.
 4. **Search tab** — type a contract date and worker count directly (works for a
    brand-new prospect that isn't in the disclosure data at all), or look up an
-   existing filing first to prefill those fields. Choose "Needs workers" or
-   "Save on outbound transportation" to see which Seso customers line up.
+   existing filing first to prefill those fields (including worksite city/state).
+   Choose "Needs workers" or "Save on outbound transportation" to see which Seso
+   customers line up, sortable the same way as the dashboard.
 
 ## Notes on the logic
 
@@ -45,6 +47,11 @@ Then open http://localhost:8811.
   confirmed contract on file.
 - Multi-entity customers (see the CSV's Enterprise Account Name grouping) are
   treated as one customer regardless of which legal entity/FEIN filed.
+- Distance is great-circle miles between worksite city/state centroids (a
+  bundled static table of ~29.7k US cities, `app/data/us_cities.csv` — no
+  external geocoding API, no network call). City-level precision, not
+  street-address precision. Unknown/unmatched cities show as "unknown" and
+  sort last rather than breaking the sort.
 
 ## Data note
 
@@ -55,21 +62,35 @@ login at all.
 
 ## Deploying to Vercel
 
+Live at https://transfer-marketplace.vercel.app (Basic Auth-gated).
+
 The app is structured for Vercel: `api/index.py` is the serverless entrypoint
-(FastAPI, routed at `/api/*` via `vercel.json`), everything under `public/` is
-served directly by the platform, and `app/database.py` switches from local
-SQLite to Postgres automatically when a `POSTGRES_URL` or `DATABASE_URL`
-env var is present.
+(FastAPI; Vercel auto-detects it and routes everything to it), the frontend
+lives in `webapp/` (deliberately **not** named `public/` — Vercel treats that
+name as reserved and publishes it directly at the edge, bypassing this app's
+auth entirely), and `app/database.py` switches from local SQLite to Postgres
+automatically when a `POSTGRES_URL` or `DATABASE_URL` env var is present.
+`vercel.json`'s `includeFiles` bundles both `webapp/` and `app/data/` (the
+city-coordinates table) into the function, since Vercel doesn't otherwise
+include non-Python files it can't trace through imports.
 
 1. Push this repo to GitHub.
 2. On [vercel.com](https://vercel.com), import the repo as a new project.
 3. In the project's **Storage** tab, add a Postgres database (Vercel
-   Postgres/Neon) — this sets `POSTGRES_URL` automatically.
+   Postgres/Neon) and connect it to the project — this is supposed to set
+   `POSTGRES_URL`/`DATABASE_URL` automatically, but **verify it actually shows
+   up** in Settings → Environment Variables; it didn't for us and had to be
+   added manually from the database's own `.env.local` panel.
 4. In **Settings → Environment Variables**, add `APP_USERNAME` and
-   `APP_PASSWORD` (the login for the whole app).
+   `APP_PASSWORD` (the login for the whole app), scoped to Production.
 5. Deploy. Tables are created automatically on first request.
 6. Open the live URL, log in, and use the Admin tab to upload the disclosure
-   `.xlsx` and customer `.csv` — same as local.
+   `.xlsx` and customer `.csv` — same as local. A full ~17k-row disclosure
+   upload takes 1-2 minutes against production Postgres; the UI says so and
+   is patient about it (240s client-side timeout, 60s server-side).
+7. Env var changes need a fresh deployment to take effect — push a commit
+   (or use the Vercel CLI: `npx vercel --prod`) rather than assuming a saved
+   variable applies to what's already running.
 
 Ingestion uses bulk insert/update (not one query per row) specifically so a
 17k-row upload stays well within a serverless function's execution time limit
