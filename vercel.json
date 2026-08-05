@@ -4,8 +4,5 @@
       "maxDuration": 60,
       "includeFiles": "public/**"
     }
-  },
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" }
-  ]
+  }
 }
