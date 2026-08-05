@@ -3,7 +3,7 @@ from datetime import date
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, Query, Request
+from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -20,17 +20,6 @@ app = FastAPI(title="H-2A Transfer Matcher")
 add_auth_middleware(app)
 
 PUBLIC_DIR = Path(__file__).parent.parent / "public"
-
-
-# TEMPORARY diagnostic route - remove once the Vercel routing issue is confirmed.
-@app.get("/__debug")
-async def __debug(request: Request):
-    return {
-        "url_path": str(request.url.path),
-        "scope_path": request.scope.get("path"),
-        "scope_raw_path": request.scope.get("raw_path", b"").decode("utf-8", "replace"),
-        "root_path": request.scope.get("root_path"),
-    }
 
 
 # ---------- Uploads ----------
