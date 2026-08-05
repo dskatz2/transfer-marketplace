@@ -35,10 +35,20 @@ Then open http://localhost:8811.
    button; dismissed matches can be restored individually or all at once from
    Admin.
 4. **Search tab** — type a contract date and worker count directly (works for a
-   brand-new prospect that isn't in the disclosure data at all), or look up an
-   existing filing first to prefill those fields (including worksite city/state).
-   Choose "Needs workers" or "Save on outbound transportation" to see which Seso
-   customers line up, sortable the same way as the dashboard.
+   brand-new prospect that isn't in the disclosure data at all), or search a
+   company by name to browse its **full contract history** first — every filing
+   on record (any worker count, not just 25+), split into Upcoming/Past,
+   expandable per-contract for wage offer/hours/case status. Expand one and hit
+   "Use this contract to search matches" to prefill the form, or fill it in by
+   hand. Choose "Needs workers" or "Save on outbound transportation" to see
+   which Seso customers line up, sortable the same way as the dashboard.
+5. **Export PDF** — from Search (after looking up a company) or from the
+   Dashboard, generate a branded PDF: contract history + matching opportunities
+   for one company, or the top overall matches across everyone. Two checkboxes
+   — anonymize Seso customers, anonymize prospects — replace real company names
+   with consistent labels ("Customer A", "Prospect B", ...) throughout the
+   document and reduce that party's location to state-only, for sharing
+   externally or building a deck without naming names.
 
 ## Notes on the logic
 
@@ -58,6 +68,21 @@ Then open http://localhost:8811.
   external geocoding API, no network call). City-level precision, not
   street-address precision. Unknown/unmatched cities show as "unknown" and
   sort last rather than breaking the sort.
+- Wage offer and hours-offered are only populated for contracts ingested after
+  this feature shipped — re-upload your latest disclosure file to backfill
+  them for existing data (harmless to re-upload; it's an upsert by case number).
+  "Crop/work type" isn't a distinct DOL field, so Job Title doubles as it.
+- PDFs are built with `reportlab` + `svglib` (both pure Python + `lxml`, which
+  has solid prebuilt wheels everywhere) — deliberately not `weasyprint`, whose
+  Cairo/Pango system dependencies are painful in a serverless environment.
+
+## Schema changes
+
+There's no Alembic here - `app/database.py`'s `run_lightweight_migrations()`
+runs on every startup and adds any column the models define but the live
+table doesn't (nullable, additive only - never drops or alters). Add a column
+to a model in `models.py` and it just shows up next deploy, locally and on
+Vercel, no manual `ALTER TABLE` needed.
 
 ## Data note
 

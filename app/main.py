@@ -1,20 +1,22 @@
+import re
 from collections import Counter
 from datetime import date
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, Query
+from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, Query, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from . import models, ingest, matching_transfers as mt
+from . import models, ingest, matching_transfers as mt, pdf_export
 from .auth import add_auth_middleware
-from .database import Base, engine, get_db
+from .database import Base, engine, get_db, run_lightweight_migrations
 from .serializers import contract_to_dict, match_to_dict, dismissed_to_dict, manual_alias_to_dict
 
 Base.metadata.create_all(bind=engine)
+run_lightweight_migrations()
 
 app = FastAPI(title="H-2A Transfer Matcher")
 add_auth_middleware(app)
@@ -220,14 +222,21 @@ def search_employers(q: str = Query(..., min_length=2), db: Session = Depends(ge
 
 @app.get("/api/search/employer-contracts")
 def employer_contracts(employer_name: str, db: Session = Depends(get_db)):
+    """Full contract history for one employer - every filing regardless of
+    worker count, split into past/upcoming, for the Search tab's company
+    profile view. (Matching itself still only considers 25+-worker contracts;
+    each entry here is flagged with qualifies_for_matching so that's visible.)"""
     contracts = (
         db.query(models.Contract)
         .filter(models.Contract.employer_name == employer_name)
-        .filter(models.Contract.worker_count >= mt.MIN_WORKERS)
-        .order_by(models.Contract.contract_start)
+        .order_by(models.Contract.contract_start.desc())
         .all()
     )
-    return [contract_to_dict(c) for c in contracts]
+    today = date.today()
+    past = [contract_to_dict(c) for c in contracts if c.contract_end < today]
+    upcoming = [contract_to_dict(c) for c in contracts if c.contract_end >= today]
+    upcoming.sort(key=lambda c: c["contract_start"])
+    return {"past": past, "upcoming": upcoming}
 
 
 @app.get("/api/search/quick-match")
@@ -296,10 +305,7 @@ def reset_dismissed(db: Session = Depends(get_db)):
 
 # ---------- Dashboard summary / visuals ----------
 
-@app.get("/api/matches/summary")
-def matches_summary(db: Session = Depends(get_db)):
-    combined = mt.customer_customer_matches(db) + mt.customer_prospect_matches(db)
-
+def _compute_kpis(combined: list) -> dict:
     total_matches = len(combined)
 
     # A single contract can appear in many matches (one ending contract can feed
@@ -317,6 +323,18 @@ def matches_summary(db: Session = Depends(get_db)):
     total_workers = sum(from_contracts_seen.values())
     avg_gap = round(sum(m.gap_days for m in combined) / total_matches, 1) if total_matches else 0
 
+    return {
+        "total_open_matches": total_matches,
+        "total_transferable_workers": total_workers,
+        "customers_with_opportunity": len(enterprise_ids),
+        "avg_gap_days": avg_gap,
+    }
+
+
+@app.get("/api/matches/summary")
+def matches_summary(db: Session = Depends(get_db)):
+    combined = mt.customer_customer_matches(db) + mt.customer_prospect_matches(db)
+    kpis = _compute_kpis(combined)
     top_matches = sorted(combined, key=lambda m: -m.transferable_workers)[:10]
 
     buckets = Counter()
@@ -333,15 +351,94 @@ def matches_summary(db: Session = Depends(get_db)):
     ]
 
     return {
-        "kpis": {
-            "total_open_matches": total_matches,
-            "total_transferable_workers": total_workers,
-            "customers_with_opportunity": len(enterprise_ids),
-            "avg_gap_days": avg_gap,
-        },
+        "kpis": kpis,
         "top_matches": [match_to_dict(m) for m in top_matches],
         "gap_histogram": gap_histogram,
     }
+
+
+# ---------- PDF exports ----------
+
+MAX_EXPORT_MATCHES = 20
+
+
+def _pdf_filename(label: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9]+", "_", label).strip("_") or "export"
+    return f"{safe}_seso_report.pdf"
+
+
+def _pdf_response(pdf_bytes: bytes, filename: str) -> Response:
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+class ExportOptions(BaseModel):
+    anonymize_customers: bool = False
+    anonymize_prospects: bool = False
+
+
+class ProspectExportRequest(ExportOptions):
+    employer_name: str
+
+
+@app.post("/api/export/prospect-pdf")
+def export_prospect_pdf(body: ProspectExportRequest, db: Session = Depends(get_db)):
+    contracts_q = (
+        db.query(models.Contract)
+        .filter(models.Contract.employer_name == body.employer_name)
+        .order_by(models.Contract.contract_start.desc())
+        .all()
+    )
+    if not contracts_q:
+        raise HTTPException(404, "No contracts on file for that employer name")
+
+    qualifying = [c for c in contracts_q if c.worker_count >= mt.MIN_WORKERS]
+    all_matches = []
+    for c in qualifying:
+        for m in mt.search_needs_workers(db, c):
+            d = match_to_dict(m)
+            d["direction"] = "Needs workers"
+            all_matches.append(d)
+        for m in mt.search_save_outbound_transportation(db, c):
+            d = match_to_dict(m)
+            d["direction"] = "Save transportation"
+            all_matches.append(d)
+    all_matches.sort(key=lambda m: -m["transferable_workers"])
+
+    pdf_bytes = pdf_export.build_prospect_pdf(
+        employer_name=body.employer_name,
+        contracts=[contract_to_dict(c) for c in contracts_q],
+        matches=all_matches[:MAX_EXPORT_MATCHES],
+        anonymize_customers=body.anonymize_customers,
+        anonymize_prospects=body.anonymize_prospects,
+        matches_total=len(all_matches),
+    )
+    return _pdf_response(pdf_bytes, _pdf_filename(body.employer_name))
+
+
+class DashboardExportRequest(ExportOptions):
+    limit: int = 15
+
+
+@app.post("/api/export/dashboard-pdf")
+def export_dashboard_pdf(body: DashboardExportRequest, db: Session = Depends(get_db)):
+    cc_all = mt.customer_customer_matches(db)
+    cp_all = mt.customer_prospect_matches(db)
+    kpis = _compute_kpis(cc_all + cp_all)
+    cc = sorted(cc_all, key=lambda m: -m.transferable_workers)[:body.limit]
+    cp = sorted(cp_all, key=lambda m: -m.transferable_workers)[:body.limit]
+
+    pdf_bytes = pdf_export.build_dashboard_pdf(
+        kpis=kpis,
+        cc_matches=[match_to_dict(m) for m in cc],
+        cp_matches=[match_to_dict(m) for m in cp],
+        anonymize_customers=body.anonymize_customers,
+        anonymize_prospects=body.anonymize_prospects,
+    )
+    return _pdf_response(pdf_bytes, _pdf_filename("top_transfer_opportunities"))
 
 
 # ---------- Frontend ----------

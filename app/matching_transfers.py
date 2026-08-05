@@ -56,6 +56,9 @@ class AdHocContract:
     fein: str | None = None
     job_title: str | None = None
     worker_count_source: str = "manual entry"
+    anticipated_hours: int | None = None
+    wage_offer: float | None = None
+    wage_offer_unit: str | None = None
     worksite_city: str | None = None
     worksite_state: str | None = None
     case_status: str = "Hypothetical — not on file"

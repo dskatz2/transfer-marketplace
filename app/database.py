@@ -1,7 +1,8 @@
 import os
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.schema import CreateColumn
 
 
 def _resolve_database_url() -> str:
@@ -39,3 +40,21 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def run_lightweight_migrations() -> None:
+    """No Alembic here - this app's schema is small enough that a simple
+    "add any column the model has but the live table doesn't" pass covers
+    every change so far. Only ever ADDs nullable columns; never drops or
+    alters existing ones. Safe to call on every startup."""
+    inspector = inspect(engine)
+    for table_name, table in Base.metadata.tables.items():
+        if not inspector.has_table(table_name):
+            continue  # brand-new table - create_all() already handles this
+        existing = {c["name"] for c in inspector.get_columns(table_name)}
+        for column in table.columns:
+            if column.name in existing:
+                continue
+            ddl = str(CreateColumn(column).compile(dialect=engine.dialect))
+            with engine.begin() as conn:
+                conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {ddl}"))

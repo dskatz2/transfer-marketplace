@@ -1,5 +1,5 @@
 from . import models
-from .matching_transfers import TransferMatch
+from .matching_transfers import TransferMatch, MIN_WORKERS
 
 
 def contract_to_dict(c: models.Contract) -> dict:
@@ -11,6 +11,9 @@ def contract_to_dict(c: models.Contract) -> dict:
         "job_title": c.job_title,
         "worker_count": c.worker_count,
         "worker_count_source": c.worker_count_source,
+        "anticipated_hours": getattr(c, "anticipated_hours", None),
+        "wage_offer": getattr(c, "wage_offer", None),
+        "wage_offer_unit": getattr(c, "wage_offer_unit", None),
         "contract_start": c.contract_start.isoformat(),
         "contract_end": c.contract_end.isoformat(),
         "worksite_city": c.worksite_city,
@@ -18,6 +21,7 @@ def contract_to_dict(c: models.Contract) -> dict:
         "case_status": c.case_status,
         "match_status": c.match_status,
         "match_confidence": c.match_confidence,
+        "qualifies_for_matching": c.worker_count >= MIN_WORKERS,
         "enterprise": {"id": c.enterprise.id, "name": c.enterprise.name} if c.enterprise else None,
         "candidate_enterprise": (
             {"id": c.candidate_enterprise.id, "name": c.candidate_enterprise.name}

@@ -82,6 +82,23 @@ def ingest_disclosure_xlsx(db: Session, file_bytes: bytes) -> dict:
 
         employer_name = _clean_str(row[idx["EMPLOYER_NAME"]]) or ""
 
+        anticipated_hours = None
+        if "ANTICIPATED_NUMBER_OF_HOURS" in idx:
+            raw_hours = row[idx["ANTICIPATED_NUMBER_OF_HOURS"]]
+            try:
+                anticipated_hours = int(raw_hours) if raw_hours not in (None, "") else None
+            except (TypeError, ValueError):
+                anticipated_hours = None
+
+        wage_offer = None
+        if "WAGE_OFFER" in idx:
+            raw_wage = row[idx["WAGE_OFFER"]]
+            try:
+                wage_offer = float(raw_wage) if raw_wage not in (None, "") else None
+            except (TypeError, ValueError):
+                wage_offer = None
+        wage_offer_unit = _clean_str(row[idx["PER"]]) if "PER" in idx else None
+
         if case_number in parsed:
             skipped_duplicate += 1
             continue
@@ -95,6 +112,9 @@ def ingest_disclosure_xlsx(db: Session, file_bytes: bytes) -> dict:
             "job_title": _clean_str(row[idx["JOB_TITLE"]]),
             "worker_count": worker_count,
             "worker_count_source": source,
+            "anticipated_hours": anticipated_hours,
+            "wage_offer": wage_offer,
+            "wage_offer_unit": wage_offer_unit,
             "contract_start": start_date,
             "contract_end": end_date,
             "worksite_city": _clean_str(row[idx["WORKSITE_CITY"]]),

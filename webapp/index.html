@@ -22,7 +22,14 @@
   <!-- DASHBOARD -->
   <section id="tab-dashboard" class="tab-panel active">
     <div class="panel">
-      <h2>Best matches right now</h2>
+      <div class="panel-head">
+        <h2>Best matches right now</h2>
+        <div class="export-row">
+          <label class="checkbox-label"><input type="checkbox" id="dash-export-anon-customers"> Anonymize customers</label>
+          <label class="checkbox-label"><input type="checkbox" id="dash-export-anon-prospects"> Anonymize prospects</label>
+          <button id="export-dashboard-pdf" class="small-btn approve">Export PDF</button>
+        </div>
+      </div>
       <div id="kpi-row" class="kpi-row"></div>
       <div class="chart-grid">
         <div class="chart-card">
@@ -90,9 +97,22 @@
         <div id="prospect-suggestions" class="suggestions hidden"></div>
       </div>
 
-      <div id="prospect-contracts" class="hidden">
-        <h3>Prefill from an existing filing?</h3>
-        <div id="contract-list"></div>
+      <div id="prospect-profile" class="hidden">
+        <h3>Contract history <span id="profile-company-name" class="muted"></span></h3>
+        <div class="profile-group">
+          <h4>Upcoming <span id="profile-upcoming-count" class="muted"></span></h4>
+          <div id="profile-upcoming-list"></div>
+        </div>
+        <div class="profile-group">
+          <h4>Past <span id="profile-past-count" class="muted"></span></h4>
+          <div id="profile-past-list"></div>
+        </div>
+
+        <div class="export-row">
+          <label class="checkbox-label"><input type="checkbox" id="export-anon-customers"> Anonymize Seso customers</label>
+          <label class="checkbox-label"><input type="checkbox" id="export-anon-prospects"> Anonymize this company</label>
+          <button id="export-prospect-pdf" class="primary-btn">Export PDF</button>
+        </div>
       </div>
 
       <div class="quick-match-form">

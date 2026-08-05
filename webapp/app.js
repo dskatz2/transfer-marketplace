@@ -304,35 +304,90 @@ function wireSearch() {
   });
 }
 
-async function loadEmployerContracts(name) {
-  const r = await fetch(`/api/search/employer-contracts?employer_name=${encodeURIComponent(name)}`);
-  const contracts = await r.json();
-  const box = document.getElementById("prospect-contracts");
-  const list = document.getElementById("contract-list");
-  if (!contracts.length) {
-    list.innerHTML = `<p class="muted">No filed contracts with 25+ workers found for this name &mdash; just fill in the date and worker count below.</p>`;
-    box.classList.remove("hidden");
-    return;
-  }
-  list.innerHTML = contracts.map((c) => `
-    <div class="contract-option" data-start="${c.contract_start}" data-end="${c.contract_end}" data-workers="${c.worker_count}" data-city="${escapeHtml(c.worksite_city || "")}" data-state="${escapeHtml(c.worksite_state || "")}">
-      <div class="title">${escapeHtml(c.job_title || "Contract")} &mdash; ${escapeHtml(c.worksite_city || "")}${c.worksite_state ? ", " + c.worksite_state : ""}</div>
-      <div class="sub">${fmtDate(c.contract_start)} &rarr; ${fmtDate(c.contract_end)} &middot; ${c.worker_count} workers</div>
-    </div>
-  `).join("");
-  box.classList.remove("hidden");
+let profileContractsById = {};
 
-  list.querySelectorAll(".contract-option").forEach((el) => {
-    el.addEventListener("click", () => {
-      list.querySelectorAll(".contract-option").forEach((x) => x.classList.remove("selected"));
-      el.classList.add("selected");
+function fmtWage(c) {
+  if (c.wage_offer === null || c.wage_offer === undefined) return "Not on file";
+  return `$${c.wage_offer.toFixed(2)} / ${c.wage_offer_unit || "Hour"}`;
+}
+
+function fmtHours(c) {
+  if (c.anticipated_hours === null || c.anticipated_hours === undefined) return "Not on file";
+  return `${c.anticipated_hours} hrs`;
+}
+
+function contractCardHtml(c) {
+  profileContractsById[c.id] = c;
+  const qualifies = c.qualifies_for_matching
+    ? `<span class="pill pill-customer">Qualifies (25+)</span>`
+    : `<span class="pill pill-prospect">Below 25-worker threshold</span>`;
+  return `
+    <details class="contract-card">
+      <summary>
+        <div class="contract-summary-main">
+          <div>
+            <div class="entity-name">${escapeHtml(c.job_title || "Contract")}</div>
+            <div class="sub">${escapeHtml(c.worksite_city || "")}${c.worksite_state ? ", " + c.worksite_state : ""} &middot; ${fmtDate(c.contract_start)} &rarr; ${fmtDate(c.contract_end)}</div>
+          </div>
+        </div>
+        <div class="contract-summary-side">
+          <strong>${c.worker_count}</strong> <span class="muted">workers</span>
+          ${qualifies}
+        </div>
+      </summary>
+      <div class="contract-detail">
+        <div class="detail-grid">
+          <div><span class="muted">Wage offer</span><div>${fmtWage(c)}</div></div>
+          <div><span class="muted">Hours offered</span><div>${fmtHours(c)}</div></div>
+          <div><span class="muted">Case status</span><div>${escapeHtml(c.case_status || "")}</div></div>
+          <div><span class="muted">Case number</span><div>${escapeHtml(c.case_number)}</div></div>
+        </div>
+        <button class="small-btn approve use-for-search" data-id="${c.id}">Use this contract to search matches</button>
+      </div>
+    </details>
+  `;
+}
+
+function wireProfileUseButtons(container) {
+  container.querySelectorAll(".use-for-search").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const c = profileContractsById[btn.dataset.id];
+      if (!c) return;
       const mode = document.querySelector('input[name="mode"]:checked').value;
-      document.getElementById("quick-date").value = mode === "needs_workers" ? el.dataset.start : el.dataset.end;
-      document.getElementById("quick-workers").value = el.dataset.workers;
-      document.getElementById("quick-city").value = el.dataset.city || "";
-      document.getElementById("quick-state").value = el.dataset.state || "";
+      document.getElementById("quick-date").value = mode === "needs_workers" ? c.contract_start : c.contract_end;
+      document.getElementById("quick-workers").value = c.worker_count;
+      document.getElementById("quick-city").value = c.worksite_city || "";
+      document.getElementById("quick-state").value = c.worksite_state || "";
+      document.querySelector(".quick-match-form").scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
+}
+
+let currentProfileEmployer = null;
+
+async function loadEmployerContracts(name) {
+  currentProfileEmployer = name;
+  profileContractsById = {};
+  const r = await fetch(`/api/search/employer-contracts?employer_name=${encodeURIComponent(name)}`);
+  const data = await r.json();
+  const box = document.getElementById("prospect-profile");
+  document.getElementById("profile-company-name").textContent = `— ${name}`;
+
+  const upcomingList = document.getElementById("profile-upcoming-list");
+  const pastList = document.getElementById("profile-past-list");
+  document.getElementById("profile-upcoming-count").textContent = `(${data.upcoming.length})`;
+  document.getElementById("profile-past-count").textContent = `(${data.past.length})`;
+
+  upcomingList.innerHTML = data.upcoming.length
+    ? data.upcoming.map(contractCardHtml).join("")
+    : `<div class="no-history">No upcoming filings on record.</div>`;
+  pastList.innerHTML = data.past.length
+    ? data.past.map(contractCardHtml).join("")
+    : `<div class="no-history">No past filings on record.</div>`;
+
+  wireProfileUseButtons(upcomingList);
+  wireProfileUseButtons(pastList);
+  box.classList.remove("hidden");
 }
 
 async function runSearch() {
@@ -653,6 +708,59 @@ async function loadDismissedList() {
   });
 }
 
+// ---------- PDF export ----------
+
+async function downloadPdf(url, body, button) {
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = "Generating…";
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      alert(data.detail || "Could not generate the PDF.");
+      return;
+    }
+    const blob = await r.blob();
+    const disposition = r.headers.get("Content-Disposition") || "";
+    const match = disposition.match(/filename="([^"]+)"/);
+    const filename = match ? match[1] : "seso_report.pdf";
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(blobUrl);
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
+}
+
+function wireExports() {
+  document.getElementById("export-prospect-pdf").addEventListener("click", async (e) => {
+    if (!currentProfileEmployer) return;
+    await downloadPdf("/api/export/prospect-pdf", {
+      employer_name: currentProfileEmployer,
+      anonymize_customers: document.getElementById("export-anon-customers").checked,
+      anonymize_prospects: document.getElementById("export-anon-prospects").checked,
+    }, e.currentTarget);
+  });
+
+  document.getElementById("export-dashboard-pdf").addEventListener("click", async (e) => {
+    await downloadPdf("/api/export/dashboard-pdf", {
+      anonymize_customers: document.getElementById("dash-export-anon-customers").checked,
+      anonymize_prospects: document.getElementById("dash-export-anon-prospects").checked,
+    }, e.currentTarget);
+  });
+}
+
 // ---------- tabs ----------
 
 function wireTabs() {
@@ -678,4 +786,5 @@ wireDashboard();
 wireSearch();
 wireAdmin();
 wireAliasForm();
+wireExports();
 refreshAll();

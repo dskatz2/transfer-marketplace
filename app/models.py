@@ -79,6 +79,9 @@ class Contract(Base):
     job_title = Column(String)
     worker_count = Column(Integer, nullable=False)
     worker_count_source = Column(String)  # "certified" or "requested"
+    anticipated_hours = Column(Integer, nullable=True)  # ANTICIPATED_NUMBER_OF_HOURS
+    wage_offer = Column(Float, nullable=True)
+    wage_offer_unit = Column(String, nullable=True)  # e.g. "Hour"
 
     contract_start = Column(Date, nullable=False, index=True)
     contract_end = Column(Date, nullable=False, index=True)

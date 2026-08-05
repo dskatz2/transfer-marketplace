@@ -373,3 +373,65 @@ tbody tr:hover { background: var(--row-hover); }
 .alias-form { align-items: flex-start; }
 .alias-form .search-row { flex: 1 1 300px; max-width: none; }
 .alias-table-wrap { margin-top: 16px; }
+
+/* ---------- Contract history / profile ---------- */
+.profile-group { margin-bottom: 18px; }
+.profile-group h4 { margin: 0 0 8px; font-size: 13px; }
+.contract-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.contract-card summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.contract-card summary::-webkit-details-marker { display: none; }
+.contract-card summary::before {
+  content: "▸";
+  color: var(--muted);
+  margin-right: 8px;
+  display: inline-block;
+  transition: transform 0.15s;
+}
+.contract-card[open] summary::before { transform: rotate(90deg); }
+.contract-card summary:hover { background: var(--row-hover); }
+.contract-summary-main { display: flex; align-items: baseline; gap: 8px; flex: 1 1 auto; min-width: 0; }
+.contract-summary-side { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.contract-detail { padding: 0 12px 12px 30px; border-top: 1px solid var(--border); }
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+.detail-grid .muted { display: block; font-size: 11px; margin-bottom: 2px; }
+.no-history { color: var(--muted); font-size: 13px; padding: 8px 0; }
+
+/* ---------- Export ---------- */
+.export-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.panel-head .export-row { margin-top: 0; padding-top: 0; border-top: none; }
