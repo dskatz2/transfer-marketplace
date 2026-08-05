@@ -366,7 +366,7 @@ async function runSearch() {
 
 // ---------- admin ----------
 
-async function postFile(url, file, { timeoutMs = 90000 } = {}) {
+async function postFile(url, file, { timeoutMs = 240000 } = {}) {
   const fd = new FormData();
   fd.append("file", file);
   const controller = new AbortController();
@@ -403,7 +403,7 @@ function wireAdmin() {
     const input = document.getElementById("disclosure-file");
     const out = document.getElementById("disclosure-result");
     if (!input.files.length) { out.textContent = "Choose a file first."; return; }
-    out.textContent = "Uploading and matching… (large files can take up to a minute)";
+    out.textContent = "Uploading and matching… (a full quarterly file can take 1-2 minutes, please don't close this tab)";
     const result = await postFile("/api/upload/disclosure", input.files[0]);
     if (!result.ok) { out.textContent = result.message; return; }
     const data = result.data;
